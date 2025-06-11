@@ -1,24 +1,29 @@
 use axum::{
     middleware as axum_mw,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 
 mod routes;
 mod middleware;
+mod database;
 use middleware as mw;
 
 #[tokio::main]
 async fn main() {
-    // build our application with routes
+    let db_pool = database::init_db().await.expect("database connection failed");
+    
     let app = Router::new()
         .route("/", get(routes::pages::home))
         .route("/hello", get(routes::pages::hello))
+        .route("/api/db-status", get(routes::api::db_status))
+        .route("/api/logs", get(routes::api::get_logs))
+        .route("/api/logs", post(routes::api::add_log))
         .fallback(routes::pages::not_found)
-        .layer(axum_mw::from_fn(mw::logger));
+        .layer(axum_mw::from_fn(mw::logger))
+        .with_state(db_pool);
 
-    // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
-    println!("🚀 Server running on http://127.0.0.1:3000");
+    println!("server running on http://127.0.0.1:3000");
     axum::serve(listener, app).await.unwrap();
 }
