@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::env;
 use tokio_postgres::{Client, Error, NoTls};
 use tokio::sync::Mutex;
 
@@ -14,33 +15,36 @@ impl DbPool {
 }
 
 pub async fn init_db() -> Result<DbPool, Error> {
-    let connection_string = "host=localhost user=postgres password=postgres dbname=dbmonitor";
+    // Read environment variables with defaults
+    let db_host = env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
+    let db_user = env::var("DB_USER").unwrap_or_else(|_| "postgres".to_string());
+    let db_password = env::var("DB_PASSWORD").unwrap_or_else(|_| "postgres".to_string());
+    let db_name = env::var("DB_NAME").unwrap_or_else(|_| "dbmonitor".to_string());
     
-    println!("connecting to PostgreSQL database...");
+    let connection_string = format!(
+        "host={} user={} password={} dbname={}",
+        db_host, db_user, db_password, db_name
+    );
     
-    // Connect to the database
-    let (client, connection) = tokio_postgres::connect(connection_string, NoTls).await?;
+    println!("connecting to pgsql database at {}...", db_host);
     
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own.
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls).await?;
+    
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("❌ Database connection error: {}", e);
+            eprintln!("database connection error: {}", e);
         }
     });
     
-    // Test the connection
     let rows = client
         .query("SELECT version()", &[])
         .await?;
     
     if let Some(row) = rows.first() {
         let version: &str = row.get(0);
-        println!("✅ Connected to PostgreSQL: {}", version.split_whitespace().take(2).collect::<Vec<_>>().join(" "));
+        println!("{} connected", version.split_whitespace().take(2).collect::<Vec<_>>().join(" v"));
     }
-    
-    println!("database connected");
-    
+        
     Ok(DbPool {
         client: Arc::new(Mutex::new(client)),
     })
