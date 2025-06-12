@@ -1,8 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-## Module Organization
-- Use modern Rust module structure: `src/routes.rs` instead of `src/routes/mod.rs`
-
