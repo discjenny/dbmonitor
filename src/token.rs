@@ -27,6 +27,7 @@ pub fn generate_token(device_id: i32) -> Result<String, jsonwebtoken::errors::Er
 pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = false; // token never expires
+    validation.required_spec_claims.clear(); // don't require "exp" claim
     let token_data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(SECRET_KEY.as_bytes()),
