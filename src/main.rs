@@ -12,6 +12,7 @@ use middleware as mw;
 #[tokio::main]
 async fn main() {
     let db_pool = database::init_db().await.expect("database connection failed");
+    database::run_migrations(&db_pool).await.expect("database migrations failed");
     
     let app = Router::new()
         .route("/", get(routes::pages::home))
