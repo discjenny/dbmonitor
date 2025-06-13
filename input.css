@@ -1,0 +1,163 @@
+@import "tailwindcss";
+@source "./src/**/*.rs";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* Maps CSS variables to Tailwind utility classes */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Light Theme Variables - Purple Accents Only */
+:root {
+  --radius: 0.625rem;
+
+  /* 60% - Dominant Neutral (Light - Off-White/Light Cool Gray) */
+  --background: oklch(0.97 0.01 260); /* Very Light Cool Gray */
+  --foreground: oklch(0.22 0.05 260); /* Dark Cool Gray/Purple */
+  --card: oklch(0.985 0.005 260); /* Slightly Lighter Off-White */
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.985 0.005 260); /* Slightly Lighter Off-White */
+  --popover-foreground: var(--foreground);
+
+  /* 30% - Secondary/Complementary (Light Gray/Cool Gray) */
+  --secondary: oklch(0.94 0.015 260); /* Light Cool Gray */
+  --secondary-foreground: oklch(0.28 0.06 260); /* Darker Cool Gray */
+  --muted: oklch(0.96 0.01 260); /* Very Light Cool Gray */
+  --muted-foreground: oklch(0.5 0.04 260); /* Medium Cool Gray */
+  --border: oklch(0.9 0.02 260); /* Slightly darker Cool Gray */
+  --input: oklch(0.9 0.02 260); /* Slightly darker Cool Gray */
+  --sidebar: oklch(0.96 0.01 260); /* Matches muted background */
+  --sidebar-foreground: var(--secondary-foreground);
+  --sidebar-border: oklch(0.88 0.02 260); /* Medium-Light Cool Gray */
+
+  /* 10% - Accent (Purples/Magentas) */
+  --primary: oklch(0.65 0.18 275); /* Mid Purple */
+  --primary-foreground: oklch(0.98 0.01 275); /* Very light purplish off-white */
+  --accent: oklch(0.7 0.15 290); /* Lighter Magenta/Purple */
+  --accent-foreground: oklch(0.98 0.01 290); /* Very light magentaish off-white */
+  --destructive: oklch(0.7 0.2 15); /* Reddish-Pink */
+  --ring: oklch(0.65 0.18 275); /* Mid Purple (for focus) */
+  --chart-1: oklch(0.6 0.18 270); /* Purple */
+  --chart-2: oklch(0.7 0.15 290); /* Magenta/Purple */
+  --chart-3: oklch(0.5 0.15 280); /* Darker Purple */
+  --chart-4: oklch(0.75 0.12 300); /* Pinkish Purple */
+  --chart-5: oklch(0.55 0.2 265); /* Deeper Purple */
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-ring: var(--ring);
+}
+
+/* Dark Theme Variables - Purple Accents Only */
+.dark {
+  /* 60% - Dominant Neutral (Dark - Off-Black/Dark Cool Gray) */
+  --background: oklch(0.22 0.05 260); /* Dark Cool Gray/Purple */
+  --foreground: oklch(0.97 0.01 260); /* Very Light Cool Gray */
+  --card: oklch(0.27 0.06 260); /* Slightly Lighter Dark Cool Gray/Purple */
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.27 0.06 260); /* Slightly Lighter Dark Cool Gray/Purple */
+  --popover-foreground: var(--foreground);
+
+  /* 30% - Secondary/Complementary (Mid-Dark Gray/Cool Gray) */
+  --secondary: oklch(0.35 0.07 260); /* Mid-Dark Cool Gray */
+  --secondary-foreground: oklch(0.95 0.015 260); /* Light Cool Gray */
+  --muted: oklch(0.3 0.06 260); /* Darker Cool Gray */
+  --muted-foreground: oklch(0.7 0.04 260); /* Medium Light Cool Gray */
+  --border: oklch(0.35 0.07 260 / 80%); /* Mid-Dark Cool Gray, slightly transparent */
+  --input: oklch(0.35 0.07 260 / 90%); /* Mid-Dark Cool Gray, slightly transparent */
+  --sidebar: oklch(0.19 0.04 260); /* Very Dark Cool Gray/Purple */
+  --sidebar-foreground: var(--secondary-foreground);
+  --sidebar-border: oklch(0.3 0.06 260 / 70%); /* Darker Cool Gray, more transparent */
+
+  /* 10% - Accent (Purples/Magentas) */
+  --primary: oklch(0.75 0.18 275); /* Bright Purple */
+  --primary-foreground: oklch(0.18 0.05 275); /* Very Dark Purple */
+  --accent: oklch(0.8 0.15 290); /* Bright Magenta/Purple */
+  --accent-foreground: oklch(0.18 0.05 290); /* Very Dark Magenta/Purple */
+  --destructive: oklch(0.75 0.22 15); /* Brighter Reddish-Pink */
+  --ring: oklch(0.75 0.18 275); /* Bright Purple (for focus) */
+  --chart-1: oklch(0.7 0.18 270); /* Purple */
+  --chart-2: oklch(0.8 0.15 290); /* Magenta/Purple */
+  --chart-3: oklch(0.6 0.15 280); /* Darker Purple */
+  --chart-4: oklch(0.85 0.12 300); /* Pinkish Purple */
+  --chart-5: oklch(0.65 0.2 265); /* Deeper Purple */
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Modern Scrollbar Styling */
+  ::-webkit-scrollbar {
+    @apply w-2; /* Adjust width as desired */
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent; /* Makes the track invisible */
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-accent rounded-lg border-2 border-solid border-transparent bg-clip-content;
+    /* Use accent color with some transparency */
+    /* Rounded corners using theme radius */
+    /* Add a small transparent border to create padding effect */
+    /* Ensure background color doesn't overlap border */
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-accent; /* Full accent color on hover */
+  }
+
+  /* Firefox scrollbar styling (optional, less customizable) */
+  /* Note: Firefox scrollbar styling is less flexible */
+  /* You might need to adjust colors based on theme */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-accent) transparent;
+  }
+}
