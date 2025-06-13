@@ -7,6 +7,7 @@
     'Noto Color Emoji';
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;
+    --color-green-500: oklch(72.3% 0.219 149.579);
     --spacing: 0.25rem;
     --container-6xl: 72rem;
     --text-xs: 0.75rem;
@@ -299,6 +300,9 @@
   }
   .bg-destructive {
     background-color: var(--destructive);
+  }
+  .bg-green-500 {
+    background-color: var(--color-green-500);
   }
   .bg-primary\/20 {
     background-color: var(--primary);
