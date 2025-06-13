@@ -30,6 +30,7 @@ async fn main() {
         // Removed /api/chart-data - chart data now sent via WebSocket OOB
         // Removed /fragments/current-reading - current reading sent via WebSocket OOB
         .route("/fragments/active-devices", get(routes::api::active_devices_fragment))
+        .route("/static/output.css", get(routes::pages::serve_css))
         .route("/ws", get(websocket::websocket_handler))
         .merge(log_routes)
         .fallback(routes::pages::not_found)
