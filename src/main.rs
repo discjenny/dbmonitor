@@ -40,7 +40,7 @@ async fn main() {
         .route("/api/cache-status", get(routes::api::cache_status))
         .route("/api/auth", get(routes::api::auth)) // need to add password or something to this route
         .route("/fragments/active-devices", get(routes::api::active_devices_fragment))
-        .route("/static/output.css", get(routes::pages::serve_css))
+        .route("/static/computed.css", get(routes::pages::serve_css))
         .route("/ws", get(websocket::websocket_handler))
         .merge(log_routes)
         .fallback(routes::pages::not_found)

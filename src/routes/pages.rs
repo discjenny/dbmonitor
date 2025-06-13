@@ -11,7 +11,7 @@ pub async fn dashboard() -> Html<String> {
 }
 
 pub async fn serve_css() -> Response {
-    let css_content = fs::read_to_string("static/output.css")
+    let css_content = fs::read_to_string("static/computed.css")
         .unwrap_or_else(|_| "/* Error loading CSS */".to_string());
     
     (

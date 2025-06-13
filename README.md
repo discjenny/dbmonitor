@@ -19,7 +19,7 @@ IoT server for real-time decibel monitoring. Handles 25,000-75,000 requests per 
 
 ## Setup
 
-Prerequisites: Rust 1.70+, PostgreSQL 12+
+Prerequisites: Rust 1.70+, PostgreSQL 12+, Tailwind v4 CLI
 
 ```bash
 git clone <repository-url>
@@ -28,6 +28,9 @@ cargo build --release
 
 # Create database
 createdb dbmonitor
+
+# Compute css (if needed)
+tailwindcss -i ./input.css -o ./static/computed.css
 
 # Run server
 cargo run --release
