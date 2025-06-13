@@ -4,12 +4,6 @@ use axum::{
 };
 use std::fs;
 
-pub async fn home() -> Html<String> {
-    let html_content = fs::read_to_string("static/home.html")
-        .unwrap_or_else(|_| "<h1>Error loading home page</h1>".to_string());
-    Html(html_content)
-}
-
 pub async fn dashboard() -> Html<String> {
     let html_content = fs::read_to_string("static/dashboard.html")
         .unwrap_or_else(|_| "<h1>Error loading dashboard</h1>".to_string());

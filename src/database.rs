@@ -20,21 +20,18 @@ pub async fn init_db() -> Result<DbPool, Box<dyn std::error::Error + Send + Sync
     
     println!("connecting to pgsql database at {}...", db_host);
     
-    // Create connection manager
     let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls)?;
     
-    // Create connection pool with optimized settings
     let pool = Pool::builder()
-        .max_size(20)           // Max 20 connections
-        .min_idle(Some(2))      // Keep at least 2 idle connections
-        .max_lifetime(Some(std::time::Duration::from_secs(3600))) // 1 hour max lifetime
-        .idle_timeout(Some(std::time::Duration::from_secs(600)))  // 10 min idle timeout
-        .connection_timeout(std::time::Duration::from_secs(30))   // 30s connection timeout
+        .max_size(20)
+        .min_idle(Some(2))
+        .max_lifetime(Some(std::time::Duration::from_secs(3600))) // 1 hour
+        .idle_timeout(Some(std::time::Duration::from_secs(600)))  // 10 min
+        .connection_timeout(std::time::Duration::from_secs(30))
         .build(manager)
         .await?;
     
-    // Test the connection and get version
-    {
+    { // test connection and get version
         let conn = pool.get().await?;
         let rows = conn.query("SELECT version()", &[]).await?;
         
@@ -45,7 +42,7 @@ pub async fn init_db() -> Result<DbPool, Box<dyn std::error::Error + Send + Sync
                 pool.state().connections
             );
         }
-    } // Connection is dropped here
+    }
         
     Ok(pool)
 }

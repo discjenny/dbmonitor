@@ -56,16 +56,12 @@ pub async fn add_log(
 ) -> Result<JsonResponse<serde_json::Value>, StatusCode> {
     let timestamp = chrono::Utc::now();
     
-    // Update cache immediately (fast)
     cache::update_device_reading(device_id, payload.decibels, timestamp).await;
     
-    // Queue throttled WebSocket update (prevents flooding)
     websocket::broadcast_reading_update(payload.decibels, device_id).await;
     
-    // Queue database insert (extremely fast - just adds to channel)
     cache::queue_insert(device_id, payload.decibels, timestamp).await;
     
-    // Return immediately - should be <1ms now!
     Ok(JsonResponse(json!({
         "status": "success",
         "message": "Decibel log queued",
@@ -149,7 +145,6 @@ pub async fn auth(State(pool): State<DbPool>) -> Result<impl IntoResponse, Statu
 }
 
 pub async fn active_devices_fragment(State(_pool): State<DbPool>) -> Result<Html<String>, StatusCode> {
-    // Get active devices from cache instead of database
     let active_devices = cache::get_active_devices().await;
     
     if active_devices.is_empty() {
@@ -164,8 +159,7 @@ pub async fn active_devices_fragment(State(_pool): State<DbPool>) -> Result<Html
 
     let mut html = String::new();
     let now = Utc::now();
-    
-    // Sort by timestamp (most recent first)
+
     let mut sorted_devices = active_devices;
     sorted_devices.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     
@@ -194,20 +188,16 @@ pub async fn active_devices_fragment(State(_pool): State<DbPool>) -> Result<Html
     Ok(Html(html))
 }
 
-
-
-// Debug endpoint to check cache status
 pub async fn cache_status(State(_pool): State<DbPool>) -> Result<JsonResponse<serde_json::Value>, StatusCode> {
     let active_devices = cache::get_active_devices().await;
     let cache_size = cache::cache_size().await;
-    let (queue_size, queue_active) = cache::get_queue_stats().await;
+    let (_, queue_active) = cache::is_queue_active().await;
     
     Ok(JsonResponse(json!({
         "cache_size": cache_size,
         "active_devices": active_devices.len(),
         "batch_processor": {
-            "active": queue_active,
-            "queue_size_approx": queue_size
+            "active": queue_active
         },
         "devices": active_devices.iter().map(|d| json!({
             "device_id": d.device_id,
