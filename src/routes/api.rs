@@ -164,8 +164,8 @@ pub async fn active_devices_fragment(State(pool): State<DbPool>) -> Result<Html<
         Ok(rows) => {
             if rows.is_empty() {
                 let html = r#"
-                    <div class="empty-state">
-                        <div class="icon">📱</div>
+                    <div class="text-center py-8 text-muted-foreground">
+                        <div class="text-5xl mb-4 opacity-50">📱</div>
                         <div>No active devices (no readings in last minute)</div>
                     </div>
                 "#;
@@ -188,14 +188,14 @@ pub async fn active_devices_fragment(State(pool): State<DbPool>) -> Result<Html<
                 };
 
                 html.push_str(&format!(r#"
-                    <div class="device-item">
-                        <div class="device-info">
-                            <div class="device-id">Device {}</div>
-                            <div class="device-reading">{:.1} dB</div>
+                    <div class="flex justify-between items-center p-4 border-b border-border hover:bg-card transition-all">
+                        <div class="flex flex-col gap-1">
+                            <div class="font-bold text-card-foreground text-lg">Device {}</div>
+                            <div class="font-bold text-primary text-xl">{:.1} dB</div>
                         </div>
-                        <div class="device-status">
-                            <div class="activity-indicator"></div>
-                            <div class="last-seen">{}</div>
+                        <div class="flex flex-col items-end gap-1">
+                            <div class="w-2 h-2 rounded-full bg-accent"></div>
+                            <div class="text-xs text-muted-foreground">{}</div>
                         </div>
                     </div>
                 "#, device_id, decibels, time_text));
@@ -216,7 +216,7 @@ pub fn broadcast_html_updates(decibels: f64, device_id: i32) {
     
     // 1. Current reading OOB swap - updates the display
     let current_reading_fragment = format!(r#"
-<div id="current-decibels" class="decibel-value" hx-swap-oob="true" data-decibels="{:.1}" data-timestamp="{}" data-device-id="{}">{:.1}</div>"#, 
+<div id="current-decibels" class="text-6xl font-bold text-primary mb-2" hx-swap-oob="true" data-decibels="{:.1}" data-timestamp="{}" data-device-id="{}">{:.1}</div>"#, 
         decibels, timestamp.to_rfc3339(), device_id, decibels);
     
     // 2. Chart data OOB fragment - hidden element with data for chart updates

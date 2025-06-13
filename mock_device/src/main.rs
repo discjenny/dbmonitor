@@ -29,21 +29,21 @@ struct DecibelSimulator {
 
 impl DecibelSimulator {
     fn new() -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         Self {
             t: 0,
-            sine_amplitude: 10.0 + rng.gen::<f64>() * 10.0,
-            sine_frequency: 20.0 + rng.gen::<f64>() * 40.0,
-            sine_phase: rng.gen::<f64>() * std::f64::consts::PI * 2.0,
+            sine_amplitude: 10.0 + rng.random::<f64>() * 10.0,
+            sine_frequency: 20.0 + rng.random::<f64>() * 40.0,
+            sine_phase: rng.random::<f64>() * std::f64::consts::PI * 2.0,
             random_offset: 0.0,
         }
     }
 
     fn randomize_sine_params(&mut self) {
-        let mut rng = rand::thread_rng();
-        self.sine_amplitude = 10.0 + rng.gen::<f64>() * 10.0;
-        self.sine_frequency = 20.0 + rng.gen::<f64>() * 40.0;
-        self.sine_phase = rng.gen::<f64>() * std::f64::consts::PI * 2.0;
+        let mut rng = rand::rng();
+        self.sine_amplitude = 10.0 + rng.random::<f64>() * 10.0;
+        self.sine_frequency = 20.0 + rng.random::<f64>() * 40.0;
+        self.sine_phase = rng.random::<f64>() * std::f64::consts::PI * 2.0;
     }
 
     fn maybe_randomize_sine(&mut self) {
@@ -55,27 +55,27 @@ impl DecibelSimulator {
     fn get_next_decibels(&mut self) -> f64 {
         self.maybe_randomize_sine();
 
-        // Sine wave for smooth periodic fluctuation
+        // sine wave for smooth periodic fluctuation
         let sine = ((self.t as f64 + self.sine_phase) / self.sine_frequency).sin() * self.sine_amplitude;
 
-        // Small random walk for realism, but keep it bounded
-        let mut rng = rand::thread_rng();
-        self.random_offset += (rng.gen::<f64>() - 0.5) * 0.5;
+        // small random walk for realism, but keep it bounded
+        let mut rng = rand::rng();
+        self.random_offset += (rng.random::<f64>() - 0.5) * 0.5;
         
-        // Keep random_offset within -5 to +5
+        // keep random_offset within -5 to +5
         self.random_offset = self.random_offset.max(-5.0).min(5.0);
 
-        // Base value in the middle of the range
+        // base value in the middle of the range
         let base = 65.0;
 
-        // Calculate next value
+        // calculate next value
         let mut decibels = base + sine + self.random_offset;
 
-        // Clamp to 50-80
+        // clamp to 50-80
         decibels = decibels.max(50.0).min(80.0);
         self.t += 1;
 
-        // Round to 1 decimal place
+        // round to 1 decimal place
         (decibels * 10.0).round() / 10.0
     }
 }
@@ -87,7 +87,7 @@ async fn fetch_token(client: &Client) -> Result<String, Box<dyn std::error::Erro
         return Err(format!("auth request failed ({})", response.status()).into());
     }
 
-    // Check for token in header first
+    // check for token in header first
     if let Some(token) = response.headers().get("x-device-token") {
         let token_str = token.to_str()?.to_string();
         fs::write(TOKEN_FILE, &token_str)?;
@@ -95,7 +95,7 @@ async fn fetch_token(client: &Client) -> Result<String, Box<dyn std::error::Erro
         return Ok(token_str);
     }
 
-    // Fallback to JSON response
+    // fallback to JSON response
     let auth_response: AuthResponse = response.json().await?;
     if let Some(token) = auth_response.token {
         fs::write(TOKEN_FILE, &token)?;
@@ -156,7 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut simulator = DecibelSimulator::new();
     let mut token = get_token(&client).await?;
 
-    println!("Starting test client...");
+    println!("starting mock device...");
 
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     
