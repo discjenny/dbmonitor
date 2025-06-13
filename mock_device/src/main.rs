@@ -158,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("starting mock device...");
 
-    let mut interval = tokio::time::interval(Duration::from_millis(100));
+    let mut interval = tokio::time::interval(Duration::from_millis(1));
     
     loop {
         interval.tick().await;
