@@ -6,13 +6,17 @@ use axum::{
 };
 use crate::database::DbPool;
 use crate::websocket;
+use crate::cache;
 use serde_json::json;
 use serde::Deserialize;
 use crate::token;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 pub async fn db_status(State(pool): State<DbPool>) -> Result<JsonResponse<serde_json::Value>, StatusCode> {
-    let client = pool.get_client().await;
+    let client = match pool.get().await {
+        Ok(conn) => conn,
+        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    };
     
     match client.query("SELECT NOW() as current_time, version() as db_version", &[]).await {
         Ok(rows) => {
@@ -47,37 +51,33 @@ pub struct NewDecibelLog {
 
 pub async fn add_log(
     Extension(device_id): Extension<i32>,
-    State(pool): State<DbPool>,
+    State(_pool): State<DbPool>,
     Json(payload): Json<NewDecibelLog>,
 ) -> Result<JsonResponse<serde_json::Value>, StatusCode> {
-    let client = pool.get_client().await;
-
-    match client
-        .execute(
-            "INSERT INTO decibel_logs (decibels, fk_device_id) VALUES ($1, $2)",
-            &[&payload.decibels, &device_id],
-        )
-        .await
-    {
-        Ok(rows_affected) => {
-            // Broadcast HTML updates to all WebSocket clients
-            broadcast_html_updates(payload.decibels, device_id);
-            
-            Ok(JsonResponse(json!({
-                "status": "success",
-                "message": "Decibel log added",
-                "rows_affected": rows_affected
-            })))
-        },
-        Err(e) => {
-            eprintln!("database insert error: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
+    let timestamp = chrono::Utc::now();
+    
+    // Update cache immediately (fast)
+    cache::update_device_reading(device_id, payload.decibels, timestamp).await;
+    
+    // Queue throttled WebSocket update (prevents flooding)
+    websocket::broadcast_reading_update(payload.decibels, device_id).await;
+    
+    // Queue database insert (extremely fast - just adds to channel)
+    cache::queue_insert(device_id, payload.decibels, timestamp).await;
+    
+    // Return immediately - should be <1ms now!
+    Ok(JsonResponse(json!({
+        "status": "success",
+        "message": "Decibel log queued",
+        "cached": true
+    })))
 }
 
 pub async fn get_logs(State(pool): State<DbPool>) -> Result<JsonResponse<serde_json::Value>, StatusCode> {
-    let client = pool.get_client().await;
+    let client = match pool.get().await {
+        Ok(conn) => conn,
+        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    };
 
     match client
         .query(
@@ -113,7 +113,10 @@ pub async fn get_logs(State(pool): State<DbPool>) -> Result<JsonResponse<serde_j
 }
 
 pub async fn auth(State(pool): State<DbPool>) -> Result<impl IntoResponse, StatusCode> {
-    let client = pool.get_client().await;
+    let client = match pool.get().await {
+        Ok(conn) => conn,
+        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    };
 
     let row = match client
         .query_one("INSERT INTO devices DEFAULT VALUES RETURNING id", &[])
@@ -145,92 +148,72 @@ pub async fn auth(State(pool): State<DbPool>) -> Result<impl IntoResponse, Statu
     Ok((headers, JsonResponse(json!({ "token": token_str, "device_id": device_id }))))
 }
 
-pub async fn active_devices_fragment(State(pool): State<DbPool>) -> Result<Html<String>, StatusCode> {
-    let client = pool.get_client().await;
-
-    // Get devices that have sent readings in the last 60 seconds
-    match client
-        .query(
-            "SELECT DISTINCT fk_device_id as device_id, 
-                    FIRST_VALUE(decibels) OVER (PARTITION BY fk_device_id ORDER BY created_at DESC) as latest_decibels,
-                    FIRST_VALUE(created_at) OVER (PARTITION BY fk_device_id ORDER BY created_at DESC) as latest_time
-             FROM decibel_logs 
-             WHERE created_at > NOW() - INTERVAL '60 seconds'
-             ORDER BY latest_time DESC",
-            &[],
-        )
-        .await
-    {
-        Ok(rows) => {
-            if rows.is_empty() {
-                let html = r#"
-                    <div class="text-center py-8 text-muted-foreground">
-                        <div class="text-5xl mb-4 opacity-50">📱</div>
-                        <div>No active devices (no readings in last minute)</div>
-                    </div>
-                "#;
-                return Ok(Html(html.to_string()));
-            }
-
-            let mut html = String::new();
-            let now = Utc::now();
-            
-            for row in rows {
-                let device_id: i32 = row.get("device_id");
-                let decibels: f64 = row.get("latest_decibels");
-                let timestamp: DateTime<Utc> = row.get("latest_time");
-                
-                let seconds_ago = (now - timestamp).num_seconds();
-                let time_text = match seconds_ago {
-                    0 => "just now".to_string(),
-                    1 => "1 second ago".to_string(),
-                    n => format!("{} seconds ago", n),
-                };
-
-                html.push_str(&format!(r#"
-                    <div class="flex justify-between items-center p-4 border-b border-border hover:bg-card transition-all">
-                        <div class="flex flex-col gap-1">
-                            <div class="font-bold text-card-foreground text-lg">Device {}</div>
-                            <div class="font-bold text-primary text-xl">{:.1} dB</div>
-                        </div>
-                        <div class="flex flex-col items-end gap-1">
-                            <div class="w-2 h-2 rounded-full bg-accent"></div>
-                            <div class="text-xs text-muted-foreground">{}</div>
-                        </div>
-                    </div>
-                "#, device_id, decibels, time_text));
-            }
-
-            Ok(Html(html))
-        }
-        Err(e) => {
-            eprintln!("database query error: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+pub async fn active_devices_fragment(State(_pool): State<DbPool>) -> Result<Html<String>, StatusCode> {
+    // Get active devices from cache instead of database
+    let active_devices = cache::get_active_devices().await;
+    
+    if active_devices.is_empty() {
+        let html = r#"
+            <div class="text-center py-8 text-muted-foreground">
+                <div class="text-5xl mb-4 opacity-50">📱</div>
+                <div>No active devices (no readings in last minute)</div>
+            </div>
+        "#;
+        return Ok(Html(html.to_string()));
     }
+
+    let mut html = String::new();
+    let now = Utc::now();
+    
+    // Sort by timestamp (most recent first)
+    let mut sorted_devices = active_devices;
+    sorted_devices.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    
+    for reading in sorted_devices {
+        let seconds_ago = (now - reading.timestamp).num_seconds();
+        let time_text = match seconds_ago {
+            0 => "just now".to_string(),
+            1 => "1 second ago".to_string(),
+            n => format!("{} seconds ago", n),
+        };
+
+        html.push_str(&format!(r#"
+            <div class="flex justify-between items-center p-4 border-b border-border hover:bg-card transition-all">
+                <div class="flex flex-col gap-1">
+                    <div class="font-bold text-card-foreground text-lg">Device {}</div>
+                    <div class="font-bold text-primary text-xl">{:.1} dB</div>
+                </div>
+                <div class="flex flex-col items-end gap-1">
+                    <div class="w-2 h-2 rounded-full bg-accent"></div>
+                    <div class="text-xs text-muted-foreground">{}</div>
+                </div>
+            </div>
+        "#, reading.device_id, reading.decibels, time_text));
+    }
+
+    Ok(Html(html))
 }
 
-// WebSocket message handler that sends HTML fragments
-pub fn broadcast_html_updates(decibels: f64, device_id: i32) {
-    let timestamp = chrono::Utc::now();
+
+
+// Debug endpoint to check cache status
+pub async fn cache_status(State(_pool): State<DbPool>) -> Result<JsonResponse<serde_json::Value>, StatusCode> {
+    let active_devices = cache::get_active_devices().await;
+    let cache_size = cache::cache_size().await;
+    let (queue_size, queue_active) = cache::get_queue_stats().await;
     
-    // 1. Current reading OOB swap - updates the display
-    let current_reading_fragment = format!(r#"
-<div id="current-decibels" class="text-6xl font-bold text-primary mb-2" hx-swap-oob="true" data-decibels="{:.1}" data-timestamp="{}" data-device-id="{}">{:.1}</div>"#, 
-        decibels, timestamp.to_rfc3339(), device_id, decibels);
-    
-    // 2. Chart data OOB fragment - hidden element with data for chart updates
-    // This follows the recommended pattern: OOB data fragment + JS event
-    let chart_data_fragment = format!(r#"
-<div id="chart-update" hx-swap-oob="true" 
-     data-decibels="{:.1}" 
-     data-timestamp="{}" 
-     data-device-id="{}" 
-     style="display:none"></div>"#, 
-        decibels, timestamp.to_rfc3339(), device_id);
-    
-    // Combine both fragments
-    let combined_message = format!("{}\n{}", current_reading_fragment, chart_data_fragment);
-    
-    websocket::broadcast_message(combined_message);
+    Ok(JsonResponse(json!({
+        "cache_size": cache_size,
+        "active_devices": active_devices.len(),
+        "batch_processor": {
+            "active": queue_active,
+            "queue_size_approx": queue_size
+        },
+        "devices": active_devices.iter().map(|d| json!({
+            "device_id": d.device_id,
+            "decibels": d.decibels,
+            "timestamp": d.timestamp.to_rfc3339(),
+            "seconds_ago": (chrono::Utc::now() - d.timestamp).num_seconds()
+        })).collect::<Vec<_>>()
+    })))
 } 

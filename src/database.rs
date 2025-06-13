@@ -1,22 +1,13 @@
-use std::sync::Arc;
 use std::env;
-use tokio_postgres::{Client, Error, NoTls};
-use tokio::sync::Mutex;
+use tokio_postgres::NoTls;
+use bb8::Pool;
+use bb8_postgres::PostgresConnectionManager;
 use std::collections::HashSet;
 use std::time::Instant;
 
-#[derive(Clone)]
-pub struct DbPool {
-    pub client: Arc<Mutex<Client>>,
-}
+pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
 
-impl DbPool {
-    pub async fn get_client(&self) -> tokio::sync::MutexGuard<'_, Client> {
-        self.client.lock().await
-    }
-}
-
-pub async fn init_db() -> Result<DbPool, Error> {
+pub async fn init_db() -> Result<DbPool, Box<dyn std::error::Error + Send + Sync>> {
     let db_host = env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
     let db_user = env::var("DB_USER").unwrap_or_else(|_| "postgres".to_string());
     let db_password = env::var("DB_PASSWORD").unwrap_or_else(|_| "postgres".to_string());
@@ -29,26 +20,34 @@ pub async fn init_db() -> Result<DbPool, Error> {
     
     println!("connecting to pgsql database at {}...", db_host);
     
-    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls).await?;
+    // Create connection manager
+    let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls)?;
     
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("database connection error: {}", e);
-        }
-    });
-    
-    let rows = client
-        .query("SELECT version()", &[])
+    // Create connection pool with optimized settings
+    let pool = Pool::builder()
+        .max_size(20)           // Max 20 connections
+        .min_idle(Some(2))      // Keep at least 2 idle connections
+        .max_lifetime(Some(std::time::Duration::from_secs(3600))) // 1 hour max lifetime
+        .idle_timeout(Some(std::time::Duration::from_secs(600)))  // 10 min idle timeout
+        .connection_timeout(std::time::Duration::from_secs(30))   // 30s connection timeout
+        .build(manager)
         .await?;
     
-    if let Some(row) = rows.first() {
-        let version: &str = row.get(0);
-        println!("{} connected", version.split_whitespace().take(2).collect::<Vec<_>>().join(" v").to_lowercase());
-    }
+    // Test the connection and get version
+    {
+        let conn = pool.get().await?;
+        let rows = conn.query("SELECT version()", &[]).await?;
         
-    Ok(DbPool {
-        client: Arc::new(Mutex::new(client)),
-    })
+        if let Some(row) = rows.first() {
+            let version: &str = row.get(0);
+            println!("{} connected with {} active connections", 
+                version.split_whitespace().take(2).collect::<Vec<_>>().join(" v").to_lowercase(),
+                pool.state().connections
+            );
+        }
+    } // Connection is dropped here
+        
+    Ok(pool)
 }
 
 mod embedded {
@@ -56,14 +55,14 @@ mod embedded {
     embed_migrations!("migrations");
 }
 
-pub async fn run_migrations(db_pool: &DbPool) -> Result<(), refinery::error::Error> {
-    let mut client = db_pool.get_client().await;
+pub async fn run_migrations(db_pool: &DbPool) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut conn = db_pool.get().await?;
 
     println!("determining migrations...");
     let start = Instant::now();
 
     // fetch versions that were already applied before running the migrations so we can later determine which ones are new
-    let pre_rows = client
+    let pre_rows = conn
         .query("SELECT version FROM refinery_schema_history", &[])
         .await
         .unwrap_or_default();
@@ -73,10 +72,10 @@ pub async fn run_migrations(db_pool: &DbPool) -> Result<(), refinery::error::Err
         .map(|row| row.get::<_, i32>("version"))
         .collect();
 
-    embedded::migrations::runner().run_async(&mut *client).await?;
+    embedded::migrations::runner().run_async(&mut *conn).await?;
 
     // fetch history again to determine which migrations were applied in this run
-    let post_rows = client
+    let post_rows = conn
         .query(
             "SELECT version, name FROM refinery_schema_history ORDER BY version",
             &[],
