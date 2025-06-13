@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Decibel Monitor</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.6/dist/ext/ws.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: white;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 300;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .card h2 {
+            margin-bottom: 1rem;
+            color: #333;
+            font-size: 1.5rem;
+            font-weight: 400;
+        }
+        
+        .current-reading {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .decibel-value {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .decibel-unit {
+            font-size: 1.2rem;
+            color: #666;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-connected {
+            background-color: #00d084;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-disconnected {
+            background-color: #ff6b6b;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }
+        
+        .active-devices {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.3s ease;
+        }
+        
+        .device-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .device-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .device-id {
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        
+        .device-reading {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+        
+        .device-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+        
+        .last-seen {
+            color: #666;
+            font-size: 0.85rem;
+        }
+        
+        .activity-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #00d084;
+        }
+        
+        .nav-link {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .device-count {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        
+        .chart-info {
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+            margin-top: 0.5rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .decibel-value {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body hx-ext="ws" ws-connect="/ws">
+    <div class="container">
+        <div class="header">
+            <h1>🔊 Decibel Monitor</h1>
+            <p class="subtitle">Real-time sound level monitoring</p>
+            <a href="/" class="nav-link">← Back to Home</a>
+        </div>
+        
+        <div class="dashboard-grid">
+            <div class="card current-reading">
+                <h2>Current Reading</h2>
+                <div id="current-reading-content">
+                    <div id="current-decibels" class="decibel-value">--</div>
+                    <div class="decibel-unit">dB</div>
+                </div>
+                <div class="device-count">
+                    <span class="status-indicator status-connected" id="connection-status"></span>
+                    <span id="connection-text">Connected</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📊 Historical Chart</h2>
+                <div class="chart-container">
+                    <canvas id="decibelChart"></canvas>
+                </div>
+                <div class="chart-info" id="chart-info">
+                    Loading chart data...
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>🟢 Active Devices</h2>
+            <div id="active-devices" class="active-devices" 
+                 hx-get="/fragments/active-devices" 
+                 hx-trigger="load, every 5s, refresh from:body">
+                <div class="empty-state">
+                    <div class="icon">📱</div>
+                    <div>Loading active devices...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden element for chart data OOB updates -->
+    <div id="chart-update" style="display:none"></div>
+
+
+
+    <script>
+        // Chart.js setup - this is the only custom JavaScript we need
+        let chart;
+        window.chartData = [];
+        
+        function initializeChart() {
+            const ctx = document.getElementById('decibelChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Decibel Level',
+                        data: [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: 30,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Decibels (dB)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    }
+                }
+            });
+        }
+        
+        window.updateChart = function() {
+            if (!chart || window.chartData.length === 0) return;
+            
+            let displayData = [];
+            let labels = [];
+            
+            // Adaptive granularity
+            const totalReadings = window.chartData.length;
+            let granularity = 1;
+            
+            if (totalReadings > 200) {
+                granularity = Math.ceil(totalReadings / 100);
+            }
+            
+            if (granularity > 1) {
+                for (let i = 0; i < window.chartData.length; i += granularity) {
+                    const chunk = window.chartData.slice(i, i + granularity);
+                    const avgDecibels = Math.round((chunk.reduce((sum, reading) => sum + reading.decibels, 0) / chunk.length) * 10) / 10;
+                    const timestamp = chunk[Math.floor(chunk.length / 2)].timestamp;
+                    
+                    displayData.push(avgDecibels);
+                    labels.push(new Date(timestamp).toLocaleTimeString());
+                }
+            } else {
+                displayData = window.chartData.map(r => r.decibels);
+                labels = window.chartData.map(r => new Date(r.timestamp).toLocaleTimeString());
+            }
+            
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = displayData;
+            chart.update();
+            
+            const chartInfo = document.getElementById('chart-info');
+            if (granularity > 1) {
+                chartInfo.textContent = `Showing ${displayData.length} aggregated points from ${totalReadings} total readings`;
+            } else {
+                chartInfo.textContent = `Showing all ${totalReadings} readings`;
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeChart();
+            document.getElementById('chart-info').textContent = 'Waiting for live data...';
+        });
+        
+        document.body.addEventListener('htmx:wsOpen', function(e) {
+            const statusIndicator = document.getElementById('connection-status');
+            const statusText = document.getElementById('connection-text');
+            if (statusIndicator) {
+                statusIndicator.className = 'status-indicator status-connected';
+            }
+            if (statusText) {
+                statusText.textContent = 'Connected';
+            }
+        });
+        
+        document.body.addEventListener('htmx:wsError', function(e) {
+            const statusIndicator = document.getElementById('connection-status');
+            const statusText = document.getElementById('connection-text');
+            if (statusIndicator) {
+                statusIndicator.className = 'status-indicator status-disconnected';
+            }
+            if (statusText) {
+                statusText.textContent = 'Disconnected';
+            }
+        });
+        
+        document.body.addEventListener('htmx:wsClose', function(e) {
+            const statusIndicator = document.getElementById('connection-status');
+            const statusText = document.getElementById('connection-text');
+            if (statusIndicator) {
+                statusIndicator.className = 'status-indicator status-disconnected';
+            }
+            if (statusText) {
+                statusText.textContent = 'Disconnected';
+            }
+        });
+        
+        // Listen for out-of-band swaps specifically
+        document.body.addEventListener('htmx:oobAfterSwap', function(e) {
+            if (e.target?.id === 'chart-update') {
+                handleChartUpdate(e.target);
+            }
+        });
+        
+        // Function to handle chart updates from OOB data fragments
+        function handleChartUpdate(element) {
+            if (!element || element.id !== 'chart-update') return;
+            
+            const decibels = parseFloat(element.dataset.decibels);
+            const timestamp = element.dataset.timestamp;
+            const deviceId = parseInt(element.dataset.deviceId);
+            
+            if (!isNaN(decibels) && timestamp && !isNaN(deviceId)) {
+                // Check for duplicates
+                const isDuplicate = window.chartData.some(existing => 
+                    existing.timestamp === timestamp && existing.device_id === deviceId
+                );
+                
+                if (!isDuplicate) {
+                    window.chartData.push({
+                        decibels: decibels,
+                        timestamp: timestamp,
+                        device_id: deviceId
+                    });
+                    window.updateChart();
+                    
+                    // Trigger active devices refresh
+                    const activeDevices = document.getElementById('active-devices');
+                    if (activeDevices) {
+                        htmx.trigger(activeDevices, 'refresh');
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html> 

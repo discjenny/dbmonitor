@@ -10,9 +10,9 @@ pub async fn home() -> Html<String> {
     Html(html_content)
 }
 
-pub async fn hello() -> Html<String> {
-    let html_content = fs::read_to_string("templates/hello.html")
-        .unwrap_or_else(|_| "<h1>Error loading hello page</h1>".to_string());
+pub async fn dashboard() -> Html<String> {
+    let html_content = fs::read_to_string("templates/dashboard.html")
+        .unwrap_or_else(|_| "<h1>Error loading dashboard</h1>".to_string());
     Html(html_content)
 }
 

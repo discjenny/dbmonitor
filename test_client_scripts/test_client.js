@@ -3,10 +3,58 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 const TOKEN_FILE = path.join(__dirname, 'token.txt');
 
 const BASE_URL = 'http://127.0.0.1:3010';
+
+// --- Decibel simulation state ---
+let t = 0; // Time step
+
+// Sine parameters that will change over time
+let sineAmplitude = 10 + Math.random() * 10; // 10–20
+let sineFrequency = 20 + Math.random() * 40; // 20–60
+let sinePhase = Math.random() * Math.PI * 2;
+
+// Random walk offset
+let randomOffset = 0;
+
+function randomizeSineParams() {
+  sineAmplitude = 10 + Math.random() * 10; // 10–20
+  sineFrequency = 20 + Math.random() * 40; // 20–60
+  sinePhase = Math.random() * Math.PI * 2;
+}
+
+// Change sine parameters every 200 steps for more randomness
+function maybeRandomizeSine() {
+  if (t % 200 === 0) randomizeSineParams();
+}
+
+function getNextDecibels() {
+  maybeRandomizeSine();
+
+  // Sine wave for smooth periodic fluctuation
+  const sine =
+    Math.sin((t + sinePhase) / sineFrequency) * sineAmplitude;
+
+  // Small random walk for realism, but keep it bounded
+  randomOffset += (Math.random() - 0.5) * 0.5;
+  // Keep randomOffset within -5 to +5
+  randomOffset = Math.max(-5, Math.min(5, randomOffset));
+
+  // Base value in the middle of the range
+  const base = 65;
+
+  // Calculate next value
+  let decibels = base + sine + randomOffset;
+
+  // Clamp to 50-80
+  decibels = Math.max(50, Math.min(80, decibels));
+  t++;
+
+  // Round to 1 decimal place
+  return Math.round(decibels * 10) / 10;
+}
 
 async function fetchToken() {
   const res = await fetch(`${BASE_URL}/api/auth`);
@@ -35,7 +83,7 @@ async function getToken() {
 }
 
 async function postLog(token) {
-  const decibels = Math.floor(Math.random() * 11) + 55; // 55-65
+  const decibels = getNextDecibels();
 
   const res = await fetch(`${BASE_URL}/api/logs`, {
     method: 'POST',
@@ -70,5 +118,5 @@ async function postLog(token) {
     } catch (err) {
       console.error('unexpected error:', err);
     }
-  }, 1000);
+  }, 100);
 })();

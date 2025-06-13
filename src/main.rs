@@ -8,6 +8,7 @@ mod routes;
 mod middleware;
 mod database;
 mod token;
+mod websocket;
 use middleware as mw;
 
 #[tokio::main]
@@ -23,9 +24,13 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(routes::pages::home))
-        .route("/hello", get(routes::pages::hello))
+        .route("/dashboard", get(routes::pages::dashboard))
         .route("/api/db-status", get(routes::api::db_status))
         .route("/api/auth", get(routes::api::auth))
+        // Removed /api/chart-data - chart data now sent via WebSocket OOB
+        // Removed /fragments/current-reading - current reading sent via WebSocket OOB
+        .route("/fragments/active-devices", get(routes::api::active_devices_fragment))
+        .route("/ws", get(websocket::websocket_handler))
         .merge(log_routes)
         .fallback(routes::pages::not_found)
         .layer(axum_mw::from_fn(mw::logger))
