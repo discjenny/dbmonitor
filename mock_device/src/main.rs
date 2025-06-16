@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::Duration;
 
 
-const BASE_URL: &str = "http://127.0.0.1:3010";
+const BASE_URL: &str = "http://192.168.1.134:3010";
 const TOKEN_FILE: &str = "token.txt";
 
 #[derive(Serialize)]
