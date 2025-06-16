@@ -295,7 +295,6 @@ dependencies = [
  "dashmap",
  "futures-util",
  "jsonwebtoken",
- "once_cell",
  "refinery",
  "serde",
  "serde_json",

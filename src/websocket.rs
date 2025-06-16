@@ -10,11 +10,11 @@ use tokio::sync::broadcast;
 use crate::database::DbPool;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use chrono::{DateTime, Utc};
 
-static BROADCAST: Lazy<broadcast::Sender<String>> = 
-    Lazy::new(|| {
+static BROADCAST: LazyLock<broadcast::Sender<String>> = 
+    LazyLock::new(|| {
         let (tx, _) = broadcast::channel(1000);
         
         start_throttling_processor(tx.clone());
@@ -29,8 +29,8 @@ struct ThrottledReading {
     timestamp: DateTime<Utc>,
 }
 
-static PENDING_READINGS: Lazy<RwLock<HashMap<i32, ThrottledReading>>> = 
-    Lazy::new(|| RwLock::new(HashMap::new()));
+static PENDING_READINGS: LazyLock<RwLock<HashMap<i32, ThrottledReading>>> = 
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 fn start_throttling_processor(sender: broadcast::Sender<String>) {
     tokio::spawn(async move {

@@ -1,9 +1,9 @@
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use std::env;
 
-static SECRET_KEY: Lazy<String> = Lazy::new(|| {
+static SECRET_KEY: LazyLock<String> = LazyLock::new(|| {
     env::var("DEVICE_TOKEN_SECRET").unwrap_or_else(|_| {
         eprintln!("DEVICE_TOKEN_SECRET not set, using insecure default key");
         "69420".to_string()

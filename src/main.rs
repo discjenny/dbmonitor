@@ -47,7 +47,7 @@ async fn main() {
         .layer(axum_mw::from_fn(mw::logger))
         .with_state(db_pool);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3010").await.unwrap();
-    println!("server running on http://127.0.0.1:3010");
+    let listener = tokio::net::TcpListener::bind("192.168.1.134:3010").await.unwrap();
+    println!("server running on http://192.168.1.134:3010");
     axum::serve(listener, app).await.unwrap();
 }

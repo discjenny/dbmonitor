@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use tokio::sync::mpsc;
 use crate::database::DbPool;
 use dashmap::DashMap;
@@ -11,7 +11,7 @@ pub struct DeviceReading {
     pub timestamp: DateTime<Utc>,
 }
 
-static ACTIVE_DEVICES: Lazy<DashMap<i32, DeviceReading>> = Lazy::new(|| {
+static ACTIVE_DEVICES: LazyLock<DashMap<i32, DeviceReading>> = LazyLock::new(|| {
     DashMap::new()
 });
 
@@ -22,8 +22,8 @@ pub struct PendingInsert {
     pub timestamp: DateTime<Utc>,
 }
 
-static INSERT_QUEUE: Lazy<tokio::sync::Mutex<Option<mpsc::UnboundedSender<PendingInsert>>>> = 
-    Lazy::new(|| tokio::sync::Mutex::new(None));
+static INSERT_QUEUE: LazyLock<tokio::sync::Mutex<Option<mpsc::UnboundedSender<PendingInsert>>>> = 
+    LazyLock::new(|| tokio::sync::Mutex::new(None));
 
 pub async fn init_batch_processor(pool: DbPool) {
     let (tx, rx) = mpsc::unbounded_channel::<PendingInsert>();
