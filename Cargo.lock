@@ -301,7 +301,6 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tokio-tungstenite 0.21.0",
- "tower",
 ]
 
 [[package]]
